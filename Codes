@@ -1,0 +1,72 @@
+!pip install python-telegram-bot sympy nest_asyncio
+
+import nest_asyncio
+import asyncio
+nest_asyncio.apply()
+
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+
+from sympy import symbols, simplify, solve, sin, cos, tan, sqrt, log, exp, diff, integrate
+from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication_application
+
+# Математическая настройка
+x, y, z = symbols('x y z')
+transformations = standard_transformations + (implicit_multiplication_application,)
+local_dict = {
+    'x': x, 'y': y, 'z': z,
+    'sin': sin, 'cos': cos, 'tan': tan,
+    'sqrt': sqrt, 'log': log, 'exp': exp,
+    'diff': diff, 'integrate': integrate,
+    'π': 3.1415926535
+}
+
+# Безопасное решение выражений
+def solve_expression(text):
+    try:
+        text = text.replace('√', 'sqrt').replace(',', '.')
+        if '=' in text:
+            left, right = text.split('=')
+            left_expr = parse_expr(left, transformations=transformations, local_dict=local_dict)
+            right_expr = parse_expr(right, transformations=transformations, local_dict=local_dict)
+            equation = left_expr - right_expr
+            solution = solve(equation, dict=True)
+            return f"Решение: {solution}" if solution else "Нет решений"
+        else:
+            expr = parse_expr(text, transformations=transformations, local_dict=local_dict)
+            result = simplify(expr)
+            return f"Результат: {result}"
+    except Exception as e:
+        return f"Ошибка при решении: {e}"
+
+# Обработка команды /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Привет! Я бот, который решает примеры, уравнения, находит производные и интегралы.\n\n"
+        "Примеры:\n"
+        "- 2*x + 3 = 7\n"
+        "- √(x+1) = 4\n"
+        "- diff(x^2 + sin(x), x)\n"
+        "- integrate(x^2, x)"
+        "- используйте * вместо ×"
+        "- используйте/ вместо ÷"
+   )
+
+# Обработка обычных сообщений
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    result = solve_expression(text)
+    await update.message.reply_text(result)
+
+# Запуск бота
+async def main():
+    TELEGRAM_BOT_TOKEN = '7541459164:AAHdrU8-Va4zrTrokzMokLpJjrt47IX3GS4'
+    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    print("Бот запущен...")
+    await app.run_polling()
+
+# Для запуска скрипта
+if __name__ == "__main__":
+    asyncio.run(main())
